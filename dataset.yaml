@@ -1,0 +1,9 @@
+path: /home/shibin/Desktop/thread rolls counter/project-2-at-2025-11-20-11-44-8592a219
+train: images
+val: images
+
+nc: 3
+names:
+  0: orange brown thread roll
+  1: pink thread roll
+  2: yellow thread roll

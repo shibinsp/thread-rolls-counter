@@ -91,7 +91,7 @@ pip install -r requirements.txt
 
 4. Run the backend:
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 1212
 ```
 
 ### Frontend Setup
@@ -111,7 +111,7 @@ npm install
 npm run dev
 ```
 
-4. Open browser at `http://localhost:5173`
+4. Open browser at `http://localhost:1111`
 
 ## Usage
 

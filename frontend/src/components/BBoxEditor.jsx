@@ -20,6 +20,7 @@ function BBoxEditor({
   readOnly = false 
 }) {
   const containerRef = useRef(null);
+  const imageRef = useRef(null);
   const [boxes, setBoxes] = useState([]);
   const [selectedBox, setSelectedBox] = useState(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -29,6 +30,8 @@ function BBoxEditor({
   const [dragStart, setDragStart] = useState(null);
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState('select'); // 'select' or 'draw'
+  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   // Initialize boxes from predictions
   useEffect(() => {
@@ -60,6 +63,59 @@ function BBoxEditor({
     }
   }, [predictions]);
 
+  // Handle image load to get actual dimensions
+  const handleImageLoad = useCallback((e) => {
+    const img = e.target;
+    setImageDimensions({
+      width: img.naturalWidth,
+      height: img.naturalHeight
+    });
+    setImageLoaded(true);
+  }, []);
+
+  // Update wrapper size on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (imageRef.current && imageLoaded) {
+        // Force re-render to recalculate wrapper size
+        setImageDimensions(prev => ({ ...prev }));
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [imageLoaded]);
+
+  // Calculate the actual displayed image size within the container
+  const getDisplayedImageSize = useCallback(() => {
+    if (!imageRef.current || !imageDimensions.width || !imageDimensions.height) {
+      return null;
+    }
+    
+    const container = containerRef.current;
+    if (!container) return null;
+    
+    const containerRect = container.getBoundingClientRect();
+    const maxWidth = containerRect.width - 32; // Account for padding
+    const maxHeight = containerRect.height - 32;
+    
+    const imageAspect = imageDimensions.width / imageDimensions.height;
+    const containerAspect = maxWidth / maxHeight;
+    
+    let displayWidth, displayHeight;
+    
+    if (imageAspect > containerAspect) {
+      // Image is wider than container - constrain by width
+      displayWidth = maxWidth;
+      displayHeight = maxWidth / imageAspect;
+    } else {
+      // Image is taller than container - constrain by height
+      displayHeight = maxHeight;
+      displayWidth = maxHeight * imageAspect;
+    }
+    
+    return { width: displayWidth, height: displayHeight };
+  }, [imageDimensions]);
+
   // Get mouse position relative to image wrapper as percentage
   const getMousePct = useCallback((e) => {
     const container = containerRef.current;
@@ -74,6 +130,20 @@ function BBoxEditor({
     const y = ((e.clientY - rect.top) / rect.height) * 100;
     return { x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) };
   }, []);
+
+  // Get wrapper style based on actual image dimensions
+  const getWrapperStyle = useCallback(() => {
+    const displaySize = getDisplayedImageSize();
+    if (!displaySize) {
+      return {};
+    }
+    return {
+      width: `${displaySize.width}px`,
+      height: `${displaySize.height}px`,
+      maxWidth: '100%',
+      maxHeight: '100%'
+    };
+  }, [getDisplayedImageSize]);
 
   // Handle mouse down on container
   const handleMouseDown = (e) => {
@@ -322,16 +392,18 @@ function BBoxEditor({
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
           >
-            <div className="bbox-image-wrapper">
+            <div className="bbox-image-wrapper" style={getWrapperStyle()}>
               <img
+                ref={imageRef}
                 src={imageUrl}
                 alt="Thread rolls"
                 className="bbox-image"
                 draggable={false}
+                onLoad={handleImageLoad}
               />
 
               {/* Render existing boxes - positioned relative to image */}
-              {boxes.map(box => (
+              {boxes.map((box, index) => (
                 <div
                   key={box.id}
                   className={`bbox ${box.id === selectedBox ? 'selected' : ''} ${box.isAiDetected ? 'ai-detected' : 'user-added'}`}
@@ -343,7 +415,7 @@ function BBoxEditor({
                   }}
                   onMouseDown={(e) => handleBoxMouseDown(e, box.id, 'move')}
                 >
-                  <span className="bbox-label">{box.isAiDetected ? '🤖' : '👤'}</span>
+                  <span className="bbox-label">{index + 1}</span>
                   {renderResizeHandles(box)}
                 </div>
               ))}

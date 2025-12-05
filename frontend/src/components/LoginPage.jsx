@@ -116,18 +116,6 @@ function LoginPage({ onLogin }) {
                 )}
               </button>
             </form>
-            
-            <div style={{ 
-              marginTop: 'var(--space-8)', 
-              padding: 'var(--space-4)', 
-              background: 'var(--sapphire-50)', 
-              borderRadius: 'var(--radius-lg)',
-              textAlign: 'center'
-            }}>
-              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', margin: 0 }}>
-                <strong>Demo credentials:</strong> admin / srini1205
-              </p>
-            </div>
           </div>
         </div>
       </div>

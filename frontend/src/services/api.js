@@ -326,6 +326,15 @@ export const api = {
     },
 
     getImageUrl(path) {
-        return `${API_BASE_URL}${path}`;
+        // Images are served by nginx from the same origin
+        // No need to prefix with API_BASE_URL since nginx handles routing
+        if (!path) return '';
+        // If path already starts with http/https, return as-is
+        if (path.startsWith('http://') || path.startsWith('https://')) {
+            return path;
+        }
+        // For relative paths like /uploads/image.jpg, return as-is
+        // The browser will request from the same origin
+        return path;
     },
 };

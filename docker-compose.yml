@@ -1,22 +1,6 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    container_name: thread_counter_db
-    environment:
-      POSTGRES_DB: thread
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    networks:
-      - thread_network
-    restart: unless-stopped
-
   # Redis Cache
   redis:
     image: redis:7-alpine
@@ -25,7 +9,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "6380:6379"
     networks:
       - thread_network
     restart: unless-stopped
@@ -37,20 +21,19 @@ services:
       dockerfile: Dockerfile
     container_name: thread_counter_backend
     environment:
-      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-changeme}@postgres:5432/thread
+      DATABASE_URL: postgresql://postgres:abcd@172.17.0.1:5432/thread
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      SECRET_KEY: ${SECRET_KEY}
+      SECRET_KEY: thread_counter_production_secret_key_2025
       DEBUG: "False"
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
+      CORS_ORIGINS: https://khubera.in,https://www.khubera.in,http://localhost,http://localhost:80,http://localhost:1111
+      ADMIN_PASSWORD: admin123
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/logs:/app/logs
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
       - redis
     networks:
       - thread_network
@@ -62,10 +45,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: thread_counter_frontend
-    environment:
-      VITE_API_URL: ${API_URL:-http://localhost:8000}
     ports:
-      - "80:80"
+      - "1111:80"
     depends_on:
       - backend
     networks:
@@ -73,7 +54,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_data:
   redis_data:
 
 networks:

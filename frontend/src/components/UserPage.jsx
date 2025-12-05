@@ -539,14 +539,57 @@ function SlotDetail({ slot, onRefresh }) {
               </div>
             ) : (
               <div className="entries-list">
-                {slot.entries.map((entry) => (
+                {slot.entries.map((entry) => {
+                  const imageUrl = entry.annotated_url || entry.image_url;
+                  const fullImageUrl = api.getImageUrl(imageUrl);
+
+                  // Debug log for first entry
+                  if (slot.entries[0]?.id === entry.id) {
+                    console.log('First entry image data:', {
+                      entry_id: entry.id,
+                      image_url: entry.image_url,
+                      annotated_url: entry.annotated_url,
+                      resolved_url: fullImageUrl,
+                      full_entry: entry
+                    });
+                  }
+
+                  return (
                   <div key={entry.id} className="entry-card">
                     <div className="entry-image">
-                      <img
-                        src={api.getImageUrl(entry.annotated_url || entry.image_url)}
-                        alt="Entry"
-                        className="entry-thumbnail"
-                      />
+                      {imageUrl ? (
+                        <img
+                          src={fullImageUrl}
+                          alt="Thread Roll Entry"
+                          className="entry-thumbnail"
+                          onError={(e) => {
+                            console.error('Image failed to load:', {
+                              annotated_url: entry.annotated_url,
+                              image_url: entry.image_url,
+                              resolved_url: fullImageUrl,
+                              entry_id: entry.id
+                            });
+                            // Try fallback to original image if annotated fails
+                            if (entry.annotated_url && e.target.src.includes(entry.annotated_url)) {
+                              e.target.src = api.getImageUrl(entry.image_url);
+                            } else {
+                              // Show a placeholder
+                              e.target.style.display = 'none';
+                              const placeholder = document.createElement('div');
+                              placeholder.className = 'image-placeholder';
+                              placeholder.textContent = '📷 Image unavailable';
+                              e.target.parentNode.appendChild(placeholder);
+                            }
+                          }}
+                          onLoad={() => {
+                            console.log('Image loaded successfully:', entry.id);
+                          }}
+                        />
+                      ) : (
+                        <div className="image-placeholder">
+                          📷 No image available
+                        </div>
+                      )}
                     </div>
                     <div className="entry-content">
                       <div className="entry-header">
@@ -619,7 +662,8 @@ function SlotDetail({ slot, onRefresh }) {
                       </button>
                     </div>
                   </div>
-                ))}
+                );
+                })}
               </div>
             )}
           </div>
@@ -1017,12 +1061,26 @@ function EditEntryModal({ entry, onClose, onSave }) {
             {/* Image Preview */}
             <div className="image-grid mb-6">
               <div className="image-box">
-                <div className="image-box-title">Original</div>
-                <img src={api.getImageUrl(entry.image_url)} alt="Original" />
+                <div className="image-box-title">ORIGINAL</div>
+                <img 
+                  src={api.getImageUrl(entry.image_url)} 
+                  alt="Original" 
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted);">Original</div>';
+                  }}
+                />
               </div>
               <div className="image-box">
-                <div className="image-box-title">Detected</div>
-                <img src={api.getImageUrl(entry.annotated_url)} alt="Annotated" />
+                <div className="image-box-title">DETECTED</div>
+                <img 
+                  src={api.getImageUrl(entry.annotated_url || entry.image_url)} 
+                  alt="Annotated" 
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted);">Annotated</div>';
+                  }}
+                />
               </div>
             </div>
 
@@ -1319,11 +1377,19 @@ function ImageCropModal({ imageData, onCrop, onClose }) {
     ctx.strokeRect(scaledCrop.x, scaledCrop.y, scaledCrop.width, scaledCrop.height);
 
     // Draw resize handles (corners and edges)
-    const handleSize = 16;
-    const edgeHandleSize = 12;
+    // Make handles larger on touch devices for better usability
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const handleSize = isTouchDevice ? 32 : 16;  // Larger for easier mobile interaction
+    const edgeHandleSize = isTouchDevice ? 28 : 12;  // Larger for easier mobile interaction
     ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = isTouchDevice ? 4 : 2;  // Thicker border on mobile
+
+    // Add glow effect on mobile for better visibility
+    if (isTouchDevice) {
+      ctx.shadowColor = 'rgba(59, 130, 246, 0.6)';
+      ctx.shadowBlur = 8;
+    }
 
     // Corner handles (bigger circles)
     const corners = [
@@ -1350,9 +1416,13 @@ function ImageCropModal({ imageData, onCrop, onClose }) {
       ctx.fillRect(edge.x - edgeHandleSize / 2, edge.y - edgeHandleSize / 2, edgeHandleSize, edgeHandleSize);
       ctx.strokeRect(edge.x - edgeHandleSize / 2, edge.y - edgeHandleSize / 2, edgeHandleSize, edgeHandleSize);
     });
+
+    // Reset shadow
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
   };
 
-  const getHandleAtPosition = (x, y) => {
+  const getHandleAtPosition = (x, y, isTouchEvent = false) => {
     const scaledCrop = {
       x: crop.x * scale,
       y: crop.y * scale,
@@ -1362,7 +1432,9 @@ function ImageCropModal({ imageData, onCrop, onClose }) {
 
     const handleSize = 16;
     const edgeHandleSize = 12;
-    const tolerance = handleSize;
+    // Increase tolerance significantly for touch events (mobile)
+    // 50px tolerance matches larger touch handles and average finger size
+    const tolerance = isTouchEvent ? 50 : handleSize;
 
     // Check corner handles
     const corners = [
@@ -1404,8 +1476,11 @@ function ImageCropModal({ imageData, onCrop, onClose }) {
   const handleMouseDown = (e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    // Scale coordinates to match canvas internal resolution
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
 
     const handle = getHandleAtPosition(x, y);
 
@@ -1425,8 +1500,11 @@ function ImageCropModal({ imageData, onCrop, onClose }) {
 
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    // Scale coordinates to match canvas internal resolution
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
 
     if (isResizing) {
       const dx = (x - dragStart.x) / scale;
@@ -1544,15 +1622,28 @@ function ImageCropModal({ imageData, onCrop, onClose }) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className="modal-overlay"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="crop-modal-title"
+    >
       <div
         className="modal modal-crop"
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '90vw', width: 'auto' }}
       >
         <div className="modal-header">
-          <h3 className="modal-title">✂️ Crop Image</h3>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <h3 id="crop-modal-title" className="modal-title">✂️ Crop Image</h3>
+          <button
+            className="modal-close"
+            onClick={onClose}
+            tabIndex="0"
+            aria-label="Close crop modal"
+          >
+            ✕
+          </button>
         </div>
 
         <div style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
@@ -1563,8 +1654,13 @@ function ImageCropModal({ imageData, onCrop, onClose }) {
             </div>
           ) : (
             <>
-              <p style={{ marginBottom: 'var(--space-3)', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-                Drag corners/edges to resize • Drag inside to move
+              <p className="crop-helper-text">
+                <span style={{ display: 'block', fontWeight: '600', marginBottom: '4px' }}>
+                  👆 Touch & Drag to Crop
+                </span>
+                <span style={{ fontSize: '0.75rem', opacity: '0.9' }}>
+                  Drag corners to resize • Drag center to move
+                </span>
               </p>
               <canvas
                 ref={canvasRef}
@@ -1582,13 +1678,21 @@ function ImageCropModal({ imageData, onCrop, onClose }) {
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
                 onTouchStart={(e) => {
+                  e.preventDefault(); // Prevent default touch behavior
                   const touch = e.touches[0];
                   const canvas = canvasRef.current;
                   const rect = canvas.getBoundingClientRect();
-                  const x = touch.clientX - rect.left;
-                  const y = touch.clientY - rect.top;
+                  // Scale coordinates to match canvas internal resolution
+                  const scaleX = canvas.width / rect.width;
+                  const scaleY = canvas.height / rect.height;
+                  const x = (touch.clientX - rect.left) * scaleX;
+                  const y = (touch.clientY - rect.top) * scaleY;
 
-                  const handle = getHandleAtPosition(x, y);
+                  // Add visual feedback for touch
+                  canvas.classList.add('touching');
+                  setTimeout(() => canvas.classList.remove('touching'), 200);
+
+                  const handle = getHandleAtPosition(x, y, true); // Pass true for touch event
 
                   if (handle && handle !== 'move') {
                     setIsResizing(true);
@@ -1606,8 +1710,11 @@ function ImageCropModal({ imageData, onCrop, onClose }) {
                   const touch = e.touches[0];
                   const canvas = canvasRef.current;
                   const rect = canvas.getBoundingClientRect();
-                  const x = touch.clientX - rect.left;
-                  const y = touch.clientY - rect.top;
+                  // Scale coordinates to match canvas internal resolution
+                  const scaleX = canvas.width / rect.width;
+                  const scaleY = canvas.height / rect.height;
+                  const x = (touch.clientX - rect.left) * scaleX;
+                  const y = (touch.clientY - rect.top) * scaleY;
 
                   if (isResizing) {
                     const dx = (x - dragStart.x) / scale;
@@ -1680,7 +1787,13 @@ function ImageCropModal({ imageData, onCrop, onClose }) {
         </div>
 
         <div className="modal-footer">
-          <button type="button" className="btn btn-secondary" onClick={onClose}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onClose}
+            tabIndex="0"
+            aria-label="Cancel cropping"
+          >
             Cancel
           </button>
           <button
@@ -1688,6 +1801,8 @@ function ImageCropModal({ imageData, onCrop, onClose }) {
             className="btn btn-primary"
             onClick={handleCrop}
             disabled={!imageLoaded}
+            tabIndex="0"
+            aria-label="Crop and upload image"
           >
             ✂️ Crop & Upload
           </button>

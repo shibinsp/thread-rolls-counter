@@ -27,6 +27,7 @@ from .auth import (
 )
 from .redis_client import cache_get, cache_set, cache_delete, cache_clear_pattern
 from .logger import logger
+from .image_validator import ImageValidator
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -61,6 +62,9 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # Initialize detector
 detector = ThreadRollDetector()
+
+# Initialize image validator
+image_validator = ImageValidator(upload_dir=UPLOAD_DIR)
 
 # Pydantic models
 class LoginRequest(BaseModel):
@@ -98,6 +102,10 @@ class SaveCorrectionsRequest(BaseModel):
     entry_id: int
     corrected_boxes: List[BoundingBox]
 
+class ImageValidationRequest(BaseModel):
+    image_url: str
+    annotated_url: Optional[str] = None
+
 # Startup event
 @app.on_event("startup")
 async def startup_event():
@@ -124,6 +132,68 @@ async def root():
         "version": "2.0.0",
         "docs": "/docs"
     }
+
+# ============ IMAGE VALIDATION ENDPOINTS ============
+@app.post("/api/validate-image")
+async def validate_image_url(request: ImageValidationRequest):
+    """
+    Validate image URLs and check if files exist
+    Returns fixed URLs or placeholders for broken images
+    """
+    result = image_validator.validate_entry_images(
+        image_url=request.image_url,
+        annotated_url=request.annotated_url
+    )
+
+    return {
+        "original": {
+            "url": request.image_url,
+            "is_valid": result["original"]["is_valid"],
+            "file_exists": result["original"]["file_exists"],
+            "fixed_url": result["original"]["suggested_url"],
+            "error": result["original"]["error"]
+        },
+        "annotated": {
+            "url": request.annotated_url,
+            "is_valid": result["annotated"]["is_valid"] if result["annotated"] else None,
+            "file_exists": result["annotated"]["file_exists"] if result["annotated"] else None,
+            "fixed_url": result["annotated"]["suggested_url"] if result["annotated"] else None,
+            "error": result["annotated"]["error"] if result["annotated"] else None
+        } if request.annotated_url else None,
+        "both_valid": result["both_valid"]
+    }
+
+@app.get("/api/validate-image/{path:path}")
+async def validate_image_path(path: str):
+    """
+    Validate a single image path
+    Usage: GET /api/validate-image/uploads/image.jpg
+    """
+    url = f"/{path}"
+    result = image_validator.validate_url(url)
+
+    return {
+        "url": url,
+        "is_valid": result["is_valid"],
+        "file_exists": result["file_exists"],
+        "fixed_url": result["suggested_url"],
+        "error": result["error"],
+        "info": image_validator.get_image_info(url) if result["is_valid"] else None
+    }
+
+@app.get("/api/image-info/{path:path}")
+async def get_image_info(path: str):
+    """
+    Get detailed information about an image
+    Usage: GET /api/image-info/uploads/image.jpg
+    """
+    url = f"/{path}"
+    info = image_validator.get_image_info(url)
+
+    if not info:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    return info
 
 # ============ AUTH ENDPOINTS ============
 @app.post("/api/auth/login")

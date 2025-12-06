@@ -51,6 +51,22 @@ export const api = {
         return response.json();
     },
 
+    async changePassword(currentPassword, newPassword) {
+        const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+            method: 'POST',
+            headers: { ...getHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                current_password: currentPassword, 
+                new_password: newPassword 
+            }),
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to change password');
+        }
+        return response.json();
+    },
+
     // Admin
     async getUsers() {
         const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
@@ -132,6 +148,55 @@ export const api = {
         if (!response.ok) {
             if (response.status === 401) throw new Error('401 Unauthorized');
             throw new Error('Failed to fetch model feedback');
+        }
+        return response.json();
+    },
+
+    // Manager endpoints
+    async getManagerDashboard() {
+        const response = await fetch(`${API_BASE_URL}/api/manager/dashboard`, {
+            headers: getHeaders(),
+        });
+        if (!response.ok) {
+            if (response.status === 401) throw new Error('401 Unauthorized');
+            if (response.status === 403) throw new Error('403 Forbidden');
+            throw new Error('Failed to fetch manager dashboard');
+        }
+        return response.json();
+    },
+
+    async getManagerUsers() {
+        const response = await fetch(`${API_BASE_URL}/api/manager/users`, {
+            headers: getHeaders(),
+        });
+        if (!response.ok) {
+            if (response.status === 401) throw new Error('401 Unauthorized');
+            if (response.status === 403) throw new Error('403 Forbidden');
+            throw new Error('Failed to fetch users');
+        }
+        return response.json();
+    },
+
+    async getUserSlotsForManager(userId) {
+        const response = await fetch(`${API_BASE_URL}/api/manager/users/${userId}/slots`, {
+            headers: getHeaders(),
+        });
+        if (!response.ok) {
+            if (response.status === 401) throw new Error('401 Unauthorized');
+            if (response.status === 403) throw new Error('403 Forbidden');
+            throw new Error('Failed to fetch user slots');
+        }
+        return response.json();
+    },
+
+    async getAllSlotsForManager() {
+        const response = await fetch(`${API_BASE_URL}/api/manager/all-slots`, {
+            headers: getHeaders(),
+        });
+        if (!response.ok) {
+            if (response.status === 401) throw new Error('401 Unauthorized');
+            if (response.status === 403) throw new Error('403 Forbidden');
+            throw new Error('Failed to fetch all slots');
         }
         return response.json();
     },

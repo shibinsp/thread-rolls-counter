@@ -182,6 +182,15 @@ async def get_admin_user(current_user: User = Depends(get_current_user)) -> User
         )
     return current_user
 
+async def get_manager_or_admin_user(current_user: User = Depends(get_current_user)) -> User:
+    """Ensure current user is manager or admin"""
+    if current_user.role not in ["admin", "manager"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Manager or Admin access required"
+        )
+    return current_user
+
 def create_default_admin(db: Session):
     """Create default admin user if not exists (PRODUCTION: with secure password)"""
     admin = db.query(User).filter(User.username == "admin").first()

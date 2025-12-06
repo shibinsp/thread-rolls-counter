@@ -2,6 +2,35 @@ import { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import { formatDate, getColorHex } from '../utils/helpers';
 import BBoxEditor from './BBoxEditor';
+import {
+  LayoutDashboard,
+  FolderOpen,
+  User,
+  Home,
+  Plus,
+  Camera,
+  CheckCircle,
+  Layers,
+  Clock,
+  Upload,
+  Edit3,
+  Trash2,
+  Target,
+  Download,
+  Grid3X3,
+  ArrowLeft,
+  Menu,
+  LogOut,
+  Settings,
+  Lock,
+  Info,
+  ChevronRight,
+  Image,
+  FileText,
+  Activity,
+  BarChart3,
+  Package
+} from 'lucide-react';
 
 function UserPage({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -12,12 +41,17 @@ function UserPage({ user, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [showCreateSlot, setShowCreateSlot] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   useEffect(() => {
     loadData();
   }, [activeTab]);
 
   const loadData = async () => {
+    if (activeTab === 'profile') {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       if (activeTab === 'dashboard') {
@@ -75,6 +109,17 @@ function UserPage({ user, onLogout }) {
     return icons[action] || '📌';
   };
 
+  const getActionIconComponent = (action) => {
+    const iconMap = {
+      create_slot: <FolderOpen size={18} />,
+      upload_image: <Camera size={18} />,
+      edit_entry: <Edit3 size={18} />,
+      submit_entry: <CheckCircle size={18} />,
+      delete_entry: <Trash2 size={18} />,
+    };
+    return iconMap[action] || <Activity size={18} />;
+  };
+
   const getActionText = (log) => {
     const actions = {
       create_slot: `created slot "${log.slot}"`,
@@ -90,7 +135,7 @@ function UserPage({ user, onLogout }) {
     <div className="app-layout">
       {/* Mobile Menu Toggle */}
       <button className="mobile-menu-toggle" onClick={() => setSidebarOpen(true)}>
-        ☰
+        <Menu size={24} />
       </button>
 
       {/* Sidebar Overlay */}
@@ -100,7 +145,7 @@ function UserPage({ user, onLogout }) {
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="sidebar-brand">
-            <div className="sidebar-brand-icon">🧵</div>
+            <div className="sidebar-brand-icon"><Package size={24} /></div>
             <span className="sidebar-brand-text">Thread Counter</span>
           </div>
         </div>
@@ -116,7 +161,7 @@ function UserPage({ user, onLogout }) {
                 setSidebarOpen(false);
               }}
             >
-              <span className="nav-item-icon">📊</span>
+              <span className="nav-item-icon"><BarChart3 size={18} /></span>
               Dashboard
             </button>
             <button
@@ -127,7 +172,7 @@ function UserPage({ user, onLogout }) {
                 setSidebarOpen(false);
               }}
             >
-              <span className="nav-item-icon">📁</span>
+              <span className="nav-item-icon"><FolderOpen size={18} /></span>
               My Slots
             </button>
           </div>
@@ -142,35 +187,84 @@ function UserPage({ user, onLogout }) {
             </div>
           </div>
           <button className="btn btn-secondary btn-block btn-sm" onClick={onLogout}>
-            🚪 Sign Out
+            <LogOut size={16} style={{marginRight: '6px'}} /> Sign Out
           </button>
         </div>
       </aside>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="mobile-bottom-nav">
+        <div className="mobile-bottom-nav-inner">
+          <button
+            className={`mobile-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('dashboard');
+              setSelectedSlot(null);
+            }}
+          >
+            <Home size={22} className="mobile-nav-item-icon" />
+            <span>Home</span>
+          </button>
+          <button
+            className={`mobile-nav-item ${activeTab === 'slots' || activeTab === 'slot-detail' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('slots');
+              setSelectedSlot(null);
+            }}
+          >
+            <FolderOpen size={22} className="mobile-nav-item-icon" />
+            <span>Slots</span>
+          </button>
+          <button
+            className={`mobile-nav-item ${activeTab === 'profile' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('profile');
+              setSelectedSlot(null);
+            }}
+          >
+            <User size={22} className="mobile-nav-item-icon" />
+            <span>Profile</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* Floating Action Button for Create Slot */}
+      {activeTab === 'slots' && (
+        <button 
+          className="mobile-fab"
+          onClick={() => setShowCreateSlot(true)}
+          aria-label="Create new slot"
+        >
+          <Plus size={24} />
+        </button>
+      )}
 
       {/* Main Content */}
       <main className="main-content">
         <header className="page-header">
           <div className="page-header-left">
             <h1>
-              {activeTab === 'dashboard' && '📊 Dashboard'}
-              {activeTab === 'slots' && '📁 My Slots'}
-              {activeTab === 'slot-detail' && `📁 ${slotDetails?.name || 'Slot'}`}
+              {activeTab === 'dashboard' && <><BarChart3 size={24} style={{marginRight: '8px', verticalAlign: 'middle'}} /> Dashboard</>}
+              {activeTab === 'slots' && <><FolderOpen size={24} style={{marginRight: '8px', verticalAlign: 'middle'}} /> My Slots</>}
+              {activeTab === 'slot-detail' && <><FolderOpen size={24} style={{marginRight: '8px', verticalAlign: 'middle'}} /> {slotDetails?.name || 'Slot'}</>}
+              {activeTab === 'profile' && <><User size={24} style={{marginRight: '8px', verticalAlign: 'middle'}} /> Profile</>}
             </h1>
             <p>
               {activeTab === 'dashboard' && 'Overview of your activity and statistics'}
               {activeTab === 'slots' && 'Manage your thread counting slots'}
               {activeTab === 'slot-detail' && 'Upload images and track thread counts'}
+              {activeTab === 'profile' && 'Manage your account settings'}
             </p>
           </div>
           <div className="page-header-actions">
             {activeTab === 'slot-detail' && (
               <button className="btn btn-secondary" onClick={handleBackToSlots}>
-                ← Back to Slots
+                <ArrowLeft size={16} /> Back
               </button>
             )}
             {activeTab === 'slots' && (
               <button className="btn btn-primary" onClick={() => setShowCreateSlot(true)}>
-                ➕ Create Slot
+                <Plus size={16} /> Create Slot
               </button>
             )}
           </div>
@@ -190,11 +284,11 @@ function UserPage({ user, onLogout }) {
                   {!dashboard ? (
                     <div className="card">
                       <div className="empty-state">
-                        <div className="empty-state-icon">📊</div>
+                        <div className="empty-state-icon"><BarChart3 size={48} /></div>
                         <p className="empty-state-title">Unable to load dashboard</p>
                         <p className="empty-state-text">Please refresh the page or try again</p>
                         <button className="btn btn-primary" onClick={() => loadData()}>
-                          🔄 Retry
+                          Retry
                         </button>
                       </div>
                     </div>
@@ -202,22 +296,22 @@ function UserPage({ user, onLogout }) {
                     <>
                       <div className="stats-grid">
                     <div className="stat-card">
-                      <div className="stat-card-icon">📁</div>
+                      <div className="stat-card-icon"><FolderOpen size={28} /></div>
                       <div className="stat-value">{dashboard.total_slots}</div>
                       <div className="stat-label">My Slots</div>
                     </div>
                     <div className="stat-card">
-                      <div className="stat-card-icon">📷</div>
+                      <div className="stat-card-icon"><Image size={28} /></div>
                       <div className="stat-value">{dashboard.total_entries}</div>
                       <div className="stat-label">Total Entries</div>
                     </div>
                     <div className="stat-card">
-                      <div className="stat-card-icon">✅</div>
+                      <div className="stat-card-icon"><CheckCircle size={28} /></div>
                       <div className="stat-value">{dashboard.submitted_entries}</div>
                       <div className="stat-label">Submitted</div>
                     </div>
                     <div className="stat-card">
-                      <div className="stat-card-icon">🧵</div>
+                      <div className="stat-card-icon"><Layers size={28} /></div>
                       <div className="stat-value">{dashboard.total_threads}</div>
                       <div className="stat-label">Total Threads</div>
                     </div>
@@ -225,12 +319,12 @@ function UserPage({ user, onLogout }) {
 
                   <div className="card">
                     <div className="card-header">
-                      <h3 className="card-title">📋 Recent Activity</h3>
+                      <h3 className="card-title"><Activity size={18} style={{marginRight: '8px'}} /> Recent Activity</h3>
                     </div>
                     <div className="card-body">
                       {dashboard.recent_activity.length === 0 ? (
                         <div className="empty-state">
-                          <div className="empty-state-icon">📭</div>
+                          <div className="empty-state-icon"><FileText size={48} /></div>
                           <p className="empty-state-title">No activity yet</p>
                           <p className="empty-state-text">Your actions will appear here</p>
                         </div>
@@ -238,7 +332,7 @@ function UserPage({ user, onLogout }) {
                         <div className="activity-list">
                           {dashboard.recent_activity.map((log, idx) => (
                             <div key={idx} className="activity-item">
-                              <div className="activity-icon">{getActionIcon(log.action)}</div>
+                              <div className="activity-icon">{getActionIconComponent(log.action)}</div>
                               <div className="activity-content">
                                 <div className="activity-text">
                                   {getActionText(log)}
@@ -262,11 +356,11 @@ function UserPage({ user, onLogout }) {
                   {slots.length === 0 ? (
                     <div className="card">
                       <div className="empty-state">
-                        <div className="empty-state-icon">📁</div>
+                        <div className="empty-state-icon"><FolderOpen size={48} /></div>
                         <p className="empty-state-title">No slots yet</p>
                         <p className="empty-state-text">Create your first slot to start counting threads</p>
                         <button className="btn btn-primary" onClick={() => setShowCreateSlot(true)}>
-                          ➕ Create Slot
+                          <Plus size={16} style={{marginRight: '4px'}} /> Create Slot
                         </button>
                       </div>
                     </div>
@@ -291,7 +385,7 @@ function UserPage({ user, onLogout }) {
                             </div>
                             {slot.latest_update && (
                               <div className="slot-footer">
-                                <span>🕐</span>
+                                <Clock size={14} />
                                 Last updated {formatDate(slot.latest_update)}
                               </div>
                             )}
@@ -307,6 +401,16 @@ function UserPage({ user, onLogout }) {
               {activeTab === 'slot-detail' && slotDetails && (
                 <SlotDetail slot={slotDetails} onRefresh={() => loadSlotDetails(selectedSlot)} />
               )}
+
+              {/* Profile */}
+              {activeTab === 'profile' && (
+                <ProfileView 
+                  user={user} 
+                  dashboard={dashboard}
+                  onLogout={onLogout}
+                  onChangePassword={() => setShowChangePassword(true)}
+                />
+              )}
             </>
           )}
         </div>
@@ -320,6 +424,14 @@ function UserPage({ user, onLogout }) {
             setShowCreateSlot(false);
             loadSlotDetails(slot.id);
           }}
+        />
+      )}
+
+      {/* Change Password Modal */}
+      {showChangePassword && (
+        <ChangePasswordModal
+          onClose={() => setShowChangePassword(false)}
+          onSuccess={() => setShowChangePassword(false)}
         />
       )}
     </div>
@@ -383,9 +495,24 @@ function SlotDetail({ slot, onRefresh }) {
 
   const handleCameraPhoto = (blob) => {
     // Convert blob to data URL for cropping
+    if (!blob) {
+      console.error('No blob received from camera');
+      setShowCamera(false);
+      return;
+    }
+    
     const reader = new FileReader();
     reader.onload = (e) => {
-      setImageToCrop(e.target.result);
+      if (e.target.result) {
+        setImageToCrop(e.target.result);
+      } else {
+        console.error('Failed to read image data');
+        alert('Failed to process captured image. Please try again.');
+      }
+    };
+    reader.onerror = (err) => {
+      console.error('FileReader error:', err);
+      alert('Failed to process captured image. Please try again.');
     };
     reader.readAsDataURL(blob);
     setShowCamera(false);
@@ -470,7 +597,7 @@ function SlotDetail({ slot, onRefresh }) {
             </div>
           ) : (
             <>
-              <div className="upload-icon">📷</div>
+              <div className="upload-icon"><Camera size={48} /></div>
               <h3 className="upload-title">Upload Thread Roll Image</h3>
               <p className="upload-subtitle">Drag & drop an image or click to browse</p>
               <div className="upload-actions">
@@ -479,10 +606,10 @@ function SlotDetail({ slot, onRefresh }) {
                   className="btn btn-primary"
                   onClick={handleCameraCapture}
                 >
-                  📸 Take Photo
+                  <Camera size={16} style={{marginRight: '4px'}} /> Take Photo
                 </button>
                 <button type="button" className="btn btn-secondary">
-                  📁 Browse Files
+                  <FolderOpen size={16} style={{marginRight: '4px'}} /> Browse Files
                 </button>
               </div>
             </>
@@ -504,21 +631,21 @@ function SlotDetail({ slot, onRefresh }) {
         {/* Entries */}
         <div className="card">
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 className="card-title">📋 Entries ({slot.entries.length})</h3>
+            <h3 className="card-title"><FileText size={18} style={{marginRight: '8px'}} /> Entries ({slot.entries.length})</h3>
             <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
               <button
                 className={`btn btn-sm ${viewMode === 'cards' ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => setViewMode('cards')}
                 title="Card View"
               >
-                🃏
+                <Grid3X3 size={16} />
               </button>
               <button
                 className={`btn btn-sm ${viewMode === 'table' ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => setShowTableSidebar(true)}
                 title="Table View"
               >
-                📊
+                <BarChart3 size={16} />
               </button>
               <button
                 className="btn btn-sm btn-secondary"
@@ -526,14 +653,14 @@ function SlotDetail({ slot, onRefresh }) {
                 disabled={downloading || slot.entries.length === 0}
                 title="Download CSV"
               >
-                {downloading ? '⏳' : '📥'} CSV
+                <Download size={16} /> CSV
               </button>
             </div>
           </div>
           <div className="card-body">
             {slot.entries.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-state-icon">📷</div>
+                <div className="empty-state-icon"><Camera size={48} /></div>
                 <p className="empty-state-title">No entries yet</p>
                 <p className="empty-state-text">Upload an image to start counting threads</p>
               </div>
@@ -577,7 +704,7 @@ function SlotDetail({ slot, onRefresh }) {
                               e.target.style.display = 'none';
                               const placeholder = document.createElement('div');
                               placeholder.className = 'image-placeholder';
-                              placeholder.textContent = '📷 Image unavailable';
+                              placeholder.textContent = 'Image unavailable';
                               e.target.parentNode.appendChild(placeholder);
                             }
                           }}
@@ -587,7 +714,7 @@ function SlotDetail({ slot, onRefresh }) {
                         />
                       ) : (
                         <div className="image-placeholder">
-                          📷 No image available
+                          No image available
                         </div>
                       )}
                     </div>
@@ -608,15 +735,15 @@ function SlotDetail({ slot, onRefresh }) {
                       </div>
                       <div className="entry-meta">
                         <div className="entry-meta-item">
-                          <span>📅</span>
+                          <Clock size={14} />
                           {formatDate(entry.created_at)}
                         </div>
                         <div className="entry-meta-item">
-                          <span>👤</span>
+                          <User size={14} />
                           {entry.user}
                         </div>
                         <div className="entry-meta-item">
-                          <span>⏱️</span>
+                          <Activity size={14} />
                           {entry.processing_time}s
                         </div>
                       </div>
@@ -624,11 +751,11 @@ function SlotDetail({ slot, onRefresh }) {
                       {entry.last_edited_by && (
                         <div className="entry-meta" style={{ marginTop: 'var(--space-2)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--border-color)' }}>
                           <div className="entry-meta-item" style={{ color: 'var(--warning-500)' }}>
-                            <span>✏️</span>
+                            <Edit3 size={14} />
                             Edited by {entry.last_edited_by}
                           </div>
                           <div className="entry-meta-item">
-                            <span>🕐</span>
+                            <Clock size={14} />
                             {formatDate(entry.last_edited_at)}
                           </div>
                           {entry.edit_count > 0 && (
@@ -643,22 +770,22 @@ function SlotDetail({ slot, onRefresh }) {
                     </div>
                     <div className="entry-actions">
                       <button className="btn btn-secondary btn-sm" onClick={() => setEditingEntry(entry)}>
-                        ✏️ Edit
+                        <Edit3 size={14} /> Edit
                       </button>
                       <button 
                         className="btn btn-secondary btn-sm" 
                         onClick={() => handleOpenBBoxEditor(entry)}
                         title="Edit bounding boxes"
                       >
-                        🎯 Boxes
+                        <Target size={14} /> Boxes
                       </button>
                       {!entry.is_submitted && (
                         <button className="btn btn-success btn-sm" onClick={() => handleSubmitEntry(entry.id)}>
-                          ✓ Submit
+                          <CheckCircle size={14} /> Submit
                         </button>
                       )}
                       <button className="btn btn-danger btn-sm" onClick={() => handleDeleteEntry(entry.id)}>
-                        🗑️
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </div>
@@ -752,7 +879,7 @@ function TableViewSidebar({ slot, onClose, onDownloadCsv, downloading }) {
     <div className="table-sidebar-overlay" onClick={onClose}>
       <div className="table-sidebar" onClick={(e) => e.stopPropagation()}>
         <div className="table-sidebar-header">
-          <h3>📊 {slot.name} - Table View</h3>
+          <h3><BarChart3 size={18} style={{marginRight: '8px'}} /> {slot.name} - Table View</h3>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -779,14 +906,14 @@ function TableViewSidebar({ slot, onClose, onDownloadCsv, downloading }) {
             onClick={onDownloadCsv}
             disabled={downloading || slot.entries.length === 0}
           >
-            {downloading ? '⏳ Downloading...' : '📥 Download CSV'}
+            {downloading ? 'Downloading...' : <><Download size={16} style={{marginRight: '4px'}} /> Download CSV</>}
           </button>
         </div>
 
         {/* Entries Table */}
         <div className="table-sidebar-content">
-          <h4 style={{ padding: 'var(--space-3)', margin: 0, background: 'var(--bg-secondary)' }}>
-            📋 Entries
+          <h4 style={{ padding: 'var(--space-3)', margin: 0, background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <FileText size={16} /> Entries
           </h4>
           <div className="table-wrapper">
             <table className="data-table">
@@ -859,8 +986,8 @@ function TableViewSidebar({ slot, onClose, onDownloadCsv, downloading }) {
           </div>
 
           {/* Edit History */}
-          <h4 style={{ padding: 'var(--space-3)', margin: 0, background: 'var(--bg-secondary)', marginTop: 'var(--space-4)' }}>
-            📝 Edit History
+          <h4 style={{ padding: 'var(--space-3)', margin: 0, background: 'var(--bg-secondary)', marginTop: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Edit3 size={16} /> Edit History
           </h4>
           <div className="edit-history-list">
             {loadingHistory ? (
@@ -875,7 +1002,7 @@ function TableViewSidebar({ slot, onClose, onDownloadCsv, downloading }) {
               editHistory.slice(0, 20).map((h) => (
                 <div key={h.id} className="edit-history-item">
                   <div className="edit-history-header">
-                    <span className="edit-history-user">👤 {h.user}</span>
+                    <span className="edit-history-user"><User size={14} style={{marginRight: '4px'}} /> {h.user}</span>
                     <span className="edit-history-time">{formatDate(h.timestamp)}</span>
                   </div>
                   <div className="edit-history-detail">
@@ -928,7 +1055,7 @@ function CreateSlotModal({ onClose, onCreated }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 className="modal-title">➕ Create New Slot</h3>
+          <h3 className="modal-title"><Plus size={18} style={{marginRight: '8px'}} /> Create New Slot</h3>
           <button className="modal-close" onClick={onClose}>
             ✕
           </button>
@@ -1051,7 +1178,7 @@ function EditEntryModal({ entry, onClose, onSave }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 className="modal-title">✏️ Edit Entry</h3>
+          <h3 className="modal-title"><Edit3 size={18} style={{marginRight: '8px'}} /> Edit Entry</h3>
           <button className="modal-close" onClick={onClose}>
             ✕
           </button>
@@ -1109,7 +1236,7 @@ function EditEntryModal({ entry, onClose, onSave }) {
                 </div>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 'var(--space-1)', textTransform: 'uppercase' }}>
-                    👤 Your Count
+                    Your Count
                   </div>
                   <input
                     type="number"
@@ -1153,7 +1280,7 @@ function EditEntryModal({ entry, onClose, onSave }) {
                 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 'var(--space-1)', textTransform: 'uppercase' }}>
-                      🎯 Wrongly Marked by AI
+                      Wrongly Marked by AI
                     </div>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
                       How many circles are incorrectly placed or missing?
@@ -1185,7 +1312,7 @@ function EditEntryModal({ entry, onClose, onSave }) {
                     alignItems: 'center',
                     gap: 'var(--space-2)'
                   }}>
-                    <span>📊</span>
+                    <BarChart3 size={14} />
                     AI Accuracy: {entry.detected_count > 0 ? Math.round(((entry.detected_count - wronglyMarked) / entry.detected_count) * 100) : 0}%
                     ({entry.detected_count - wronglyMarked} correct out of {entry.detected_count} detected)
                   </div>
@@ -1200,7 +1327,7 @@ function EditEntryModal({ entry, onClose, onSave }) {
                   Color Breakdown
                 </label>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={addColor}>
-                  ➕ Add Color
+                  <Plus size={14} style={{marginRight: '4px'}} /> Add Color
                 </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -1308,7 +1435,7 @@ function ImageCropModal({ imageData, onCrop, onClose }) {
   const [imageLoaded, setImageLoaded] = useState(false);
 
   useEffect(() => {
-    const img = new Image();
+    const img = document.createElement('img');
     img.onload = () => {
       setImage(img);
       // Initialize crop area to cover 80% of image from center
@@ -1319,8 +1446,13 @@ function ImageCropModal({ imageData, onCrop, onClose }) {
       setCrop({ x, y, width, height });
       setImageLoaded(true);
     };
+    img.onerror = () => {
+      console.error('Failed to load image for cropping');
+      alert('Failed to load image. Please try again.');
+      onClose();
+    };
     img.src = imageData;
-  }, [imageData]);
+  }, [imageData, onClose]);
 
   useEffect(() => {
     if (!image || !canvasRef.current || !imageLoaded) return;
@@ -1891,7 +2023,7 @@ function CameraModal({ onCapture, onClose }) {
         }}
       >
         <div className="modal-header" style={{ background: 'rgba(0,0,0,0.8)', color: '#fff' }}>
-          <h3 className="modal-title">📸 Take Photo</h3>
+          <h3 className="modal-title"><Camera size={18} style={{marginRight: '8px'}} /> Take Photo</h3>
           <button
             className="modal-close"
             onClick={handleClose}
@@ -1908,7 +2040,7 @@ function CameraModal({ onCapture, onClose }) {
               textAlign: 'center',
               color: '#fff'
             }}>
-              <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>📷</div>
+              <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}><Camera size={48} /></div>
               <p style={{ marginBottom: 'var(--space-4)' }}>{error}</p>
               <button className="btn btn-secondary" onClick={handleClose}>
                 Close
@@ -1965,10 +2097,180 @@ function CameraModal({ onCapture, onClose }) {
               disabled={capturing || !stream}
               style={{ minWidth: 150 }}
             >
-              {capturing ? 'Capturing...' : '📸 Capture'}
+              {capturing ? 'Capturing...' : <><Camera size={18} style={{marginRight: '4px'}} /> Capture</>}
             </button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Profile View Component
+function ProfileView({ user, dashboard, onLogout, onChangePassword }) {
+  return (
+    <div className="profile-container">
+      {/* Profile Header Card */}
+      <div className="profile-header-card">
+        <div className="profile-avatar-large">
+          {user.username[0].toUpperCase()}
+        </div>
+        <div className="profile-info">
+          <h2 className="profile-name">{user.username}</h2>
+          <span className="profile-role-badge">{user.role}</span>
+        </div>
+      </div>
+
+      {/* Stats Summary */}
+      {dashboard && (
+        <div className="profile-stats-card">
+          <h3 className="profile-section-title"><BarChart3 size={18} style={{marginRight: '8px'}} /> Your Statistics</h3>
+          <div className="profile-stats-grid">
+            <div className="profile-stat-item">
+              <span className="profile-stat-value">{dashboard.total_slots}</span>
+              <span className="profile-stat-label">Slots</span>
+            </div>
+            <div className="profile-stat-item">
+              <span className="profile-stat-value">{dashboard.total_entries}</span>
+              <span className="profile-stat-label">Entries</span>
+            </div>
+            <div className="profile-stat-item">
+              <span className="profile-stat-value">{dashboard.submitted_entries}</span>
+              <span className="profile-stat-label">Submitted</span>
+            </div>
+            <div className="profile-stat-item">
+              <span className="profile-stat-value">{dashboard.total_threads}</span>
+              <span className="profile-stat-label">Threads</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Account Settings */}
+      <div className="profile-settings-card">
+        <h3 className="profile-section-title"><Settings size={18} style={{marginRight: '8px'}} /> Account Settings</h3>
+        <div className="profile-settings-list">
+          <button className="profile-setting-item" onClick={onChangePassword}>
+            <span className="profile-setting-icon"><Lock size={18} /></span>
+            <span className="profile-setting-text">Change Password</span>
+            <span className="profile-setting-arrow"><ChevronRight size={18} /></span>
+          </button>
+        </div>
+      </div>
+
+      {/* App Info */}
+      <div className="profile-info-card">
+        <h3 className="profile-section-title"><Info size={18} style={{marginRight: '8px'}} /> About</h3>
+        <div className="profile-info-list">
+          <div className="profile-info-item">
+            <span className="profile-info-label">App Version</span>
+            <span className="profile-info-value">2.0.0</span>
+          </div>
+          <div className="profile-info-item">
+            <span className="profile-info-label">Account Type</span>
+            <span className="profile-info-value" style={{ textTransform: 'capitalize' }}>{user.role}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Logout Button */}
+      <button className="profile-logout-btn" onClick={onLogout}>
+        <LogOut size={18} style={{marginRight: '8px'}} /> Sign Out
+      </button>
+    </div>
+  );
+}
+
+// Change Password Modal
+function ChangePasswordModal({ onClose, onSuccess }) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (newPassword !== confirmPassword) {
+      setError('New passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await api.changePassword(currentPassword, newPassword);
+      alert('Password changed successfully!');
+      onSuccess();
+    } catch (err) {
+      setError(err.message || 'Failed to change password');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title"><Lock size={18} style={{marginRight: '8px'}} /> Change Password</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            {error && <div className="login-error">⚠️ {error}</div>}
+            
+            <div className="form-group">
+              <label className="form-label">Current Password</label>
+              <input
+                type="password"
+                className="form-input form-input-simple"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Enter current password"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">New Password</label>
+              <input
+                type="password"
+                className="form-input form-input-simple"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password"
+                required
+                minLength={6}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Confirm New Password</label>
+              <input
+                type="password"
+                className="form-input form-input-simple"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+                required
+              />
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={loading}>
+              {loading ? 'Changing...' : 'Change Password'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

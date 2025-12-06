@@ -23,7 +23,7 @@ from .models import User, Slot, SlotEntry, ActivityLog, Analysis, EntryEditHisto
 from .vision import ThreadRollDetector
 from .auth import (
     hash_password, verify_password, create_token, invalidate_token,
-    get_current_user, get_admin_user, create_default_admin
+    get_current_user, get_admin_user, get_manager_or_admin_user, create_default_admin
 )
 from .redis_client import cache_get, cache_set, cache_delete, cache_clear_pattern
 from .logger import logger
@@ -234,6 +234,30 @@ async def get_me(current_user: User = Depends(get_current_user)):
         "role": current_user.role
     }
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+@app.post("/api/auth/change-password")
+async def change_password(
+    request: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Verify current password
+    if not verify_password(request.current_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    # Validate new password
+    if len(request.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    
+    # Update password
+    current_user.password_hash = hash_password(request.new_password)
+    db.commit()
+    
+    return {"message": "Password changed successfully"}
+
 # ============ ADMIN ENDPOINTS ============
 @app.get("/api/admin/users")
 async def get_users(
@@ -333,7 +357,14 @@ async def get_admin_dashboard(
     admin: User = Depends(get_admin_user),
     db: Session = Depends(get_db)
 ):
+    # Try to get from cache first
+    cache_key = "admin:dashboard"
+    cached = cache_get(cache_key)
+    if cached:
+        return cached
+    
     total_users = db.query(User).filter(User.role == "user").count()
+    total_managers = db.query(User).filter(User.role == "manager").count()
     total_slots = db.query(Slot).count()
     total_entries = db.query(SlotEntry).count()
     submitted_entries = db.query(SlotEntry).filter(SlotEntry.is_submitted == True).count()
@@ -351,19 +382,195 @@ async def get_admin_dashboard(
             "timestamp": log.timestamp.isoformat()
         })
     
-    return {
+    result = {
         "total_users": total_users,
+        "total_managers": total_managers,
         "total_slots": total_slots,
         "total_entries": total_entries,
         "submitted_entries": submitted_entries,
         "recent_activity": recent_activity
     }
+    
+    # Cache for 60 seconds
+    cache_set(cache_key, result, ex=60)
+    return result
+
+# ============ MANAGER ENDPOINTS ============
+@app.get("/api/manager/users")
+async def get_manager_users(
+    manager: User = Depends(get_manager_or_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Get all users (for managers and admins)"""
+    users = db.query(User).filter(User.role == "user").all()
+    result = []
+    for u in users:
+        # Get user's slot count
+        slot_count = db.query(Slot).filter(Slot.created_by == u.id).count()
+        # Get user's entry count
+        entry_count = db.query(SlotEntry).join(Slot).filter(Slot.created_by == u.id).count()
+        # Get submitted count
+        submitted_count = db.query(SlotEntry).join(Slot).filter(
+            Slot.created_by == u.id,
+            SlotEntry.is_submitted == True
+        ).count()
+        
+        result.append({
+            "id": u.id,
+            "username": u.username,
+            "role": u.role,
+            "is_active": u.is_active,
+            "created_at": u.created_at.isoformat(),
+            "slot_count": slot_count,
+            "entry_count": entry_count,
+            "submitted_count": submitted_count
+        })
+    return result
+
+@app.get("/api/manager/users/{user_id}/slots")
+async def get_user_slots_for_manager(
+    user_id: int,
+    manager: User = Depends(get_manager_or_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Get all slots for a specific user (manager view)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    slots = db.query(Slot).filter(Slot.created_by == user_id).order_by(Slot.created_at.desc()).all()
+    result = []
+    for slot in slots:
+        entry_count = db.query(SlotEntry).filter(SlotEntry.slot_id == slot.id).count()
+        latest_entry = db.query(SlotEntry).filter(SlotEntry.slot_id == slot.id).order_by(SlotEntry.created_at.desc()).first()
+        submitted_count = db.query(SlotEntry).filter(
+            SlotEntry.slot_id == slot.id,
+            SlotEntry.is_submitted == True
+        ).count()
+        
+        result.append({
+            "id": slot.id,
+            "name": slot.name,
+            "description": slot.description,
+            "created_at": slot.created_at.isoformat(),
+            "entry_count": entry_count,
+            "submitted_count": submitted_count,
+            "latest_count": latest_entry.final_count if latest_entry else 0,
+            "latest_update": latest_entry.updated_at.isoformat() if latest_entry else None
+        })
+    
+    return {
+        "user": {
+            "id": user.id,
+            "username": user.username
+        },
+        "slots": result
+    }
+
+@app.get("/api/manager/all-slots")
+async def get_all_slots_for_manager(
+    manager: User = Depends(get_manager_or_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Get all slots from all users (manager/admin view)"""
+    # Try cache first
+    cache_key = "manager:all_slots"
+    cached = cache_get(cache_key)
+    if cached:
+        return cached
+    
+    slots = db.query(Slot).order_by(Slot.created_at.desc()).all()
+    result = []
+    for slot in slots:
+        entry_count = db.query(SlotEntry).filter(SlotEntry.slot_id == slot.id).count()
+        latest_entry = db.query(SlotEntry).filter(SlotEntry.slot_id == slot.id).order_by(SlotEntry.created_at.desc()).first()
+        creator = db.query(User).filter(User.id == slot.created_by).first()
+        submitted_count = db.query(SlotEntry).filter(
+            SlotEntry.slot_id == slot.id,
+            SlotEntry.is_submitted == True
+        ).count()
+        
+        result.append({
+            "id": slot.id,
+            "name": slot.name,
+            "description": slot.description,
+            "created_at": slot.created_at.isoformat(),
+            "created_by": creator.username if creator else "Unknown",
+            "created_by_id": slot.created_by,
+            "entry_count": entry_count,
+            "submitted_count": submitted_count,
+            "latest_count": latest_entry.final_count if latest_entry else 0,
+            "latest_update": latest_entry.updated_at.isoformat() if latest_entry else None
+        })
+    
+    # Cache for 30 seconds
+    cache_set(cache_key, result, ex=30)
+    return result
+
+@app.get("/api/manager/dashboard")
+async def get_manager_dashboard(
+    manager: User = Depends(get_manager_or_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Dashboard for managers showing overview of all users and slots"""
+    # Try cache first
+    cache_key = "manager:dashboard"
+    cached = cache_get(cache_key)
+    if cached:
+        return cached
+    
+    total_users = db.query(User).filter(User.role == "user").count()
+    total_slots = db.query(Slot).count()
+    total_entries = db.query(SlotEntry).count()
+    submitted_entries = db.query(SlotEntry).filter(SlotEntry.is_submitted == True).count()
+    total_threads = db.query(func.sum(SlotEntry.final_count)).filter(SlotEntry.is_submitted == True).scalar() or 0
+    
+    # Top users by slots
+    top_users = db.query(
+        User.username,
+        func.count(Slot.id).label('slot_count')
+    ).join(Slot, Slot.created_by == User.id).group_by(User.username).order_by(
+        func.count(Slot.id).desc()
+    ).limit(5).all()
+    
+    # Recent activity
+    recent_logs = db.query(ActivityLog).order_by(ActivityLog.timestamp.desc()).limit(15).all()
+    recent_activity = []
+    for log in recent_logs:
+        user = db.query(User).filter(User.id == log.user_id).first()
+        slot = db.query(Slot).filter(Slot.id == log.slot_id).first() if log.slot_id else None
+        recent_activity.append({
+            "user": user.username if user else "Unknown",
+            "slot": slot.name if slot else None,
+            "action": log.action,
+            "timestamp": log.timestamp.isoformat()
+        })
+    
+    result = {
+        "total_users": total_users,
+        "total_slots": total_slots,
+        "total_entries": total_entries,
+        "submitted_entries": submitted_entries,
+        "total_threads": total_threads,
+        "top_users": [{"username": u[0], "slot_count": u[1]} for u in top_users],
+        "recent_activity": recent_activity
+    }
+    
+    # Cache for 60 seconds
+    cache_set(cache_key, result, ex=60)
+    return result
 
 @app.get("/api/user/dashboard")
 async def get_user_dashboard(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Try cache first (user-specific cache)
+    cache_key = f"user:dashboard:{current_user.id}"
+    cached = cache_get(cache_key)
+    if cached:
+        return cached
+    
     # User's slots
     user_slots = db.query(Slot).filter(Slot.created_by == current_user.id).count()
 
@@ -397,13 +604,17 @@ async def get_user_dashboard(
             "details": log.details
         })
 
-    return {
+    result = {
         "total_slots": user_slots,
         "total_entries": user_entries,
         "submitted_entries": user_submitted,
         "total_threads": total_threads,
         "recent_activity": recent_activity
     }
+    
+    # Cache for 30 seconds
+    cache_set(cache_key, result, ex=30)
+    return result
 
 @app.get("/api/admin/model-feedback")
 async def get_model_feedback(
